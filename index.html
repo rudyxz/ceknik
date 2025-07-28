@@ -1,292 +1,59 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIK Parser</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8; /* Light blue-gray background */
-        }
-        .container {
-            background-color: #ffffff; /* White background for the card */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Subtle shadow */
-        }
-        .input-field {
-            border: 1px solid #cbd5e0; /* Light gray border */
-            transition: border-color 0.2s ease-in-out;
-        }
-        .input-field:focus {
-            border-color: #3b82f6; /* Blue border on focus */
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); /* Focus ring */
-        }
-        .btn-primary {
-            background-color: #3b82f6; /* Blue background */
-            transition: background-color 0.2s ease-in-out;
-        }
-        .btn-primary:hover {
-            background-color: #2563eb; /* Darker blue on hover */
-        }
-        .result-box {
-            background-color: #f8fafc; /* Lighter background for results */
-            border: 1px solid #e2e8f0; /* Light border */
-        }
-        .error-message {
-            color: #ef4444; /* Red color for errors */
-        }
-        .loading-spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #3b82f6;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Akses Kamera Custom</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+      font-family: sans-serif;
+    }
+
+    #cameraBtn {
+      background-color: #4CAF50;
+      color: white;
+      padding: 15px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    #cameraBtn:hover {
+      background-color: #45a049;
+    }
+
+    video {
+      margin-top: 20px;
+      width: 90%;
+      max-width: 480px;
+      border: 3px solid #4CAF50;
+      border-radius: 10px;
+    }
+  </style>
 </head>
-<body class="p-4 flex items-center justify-center min-h-screen">
-    <div class="container mx-auto p-6 md:p-8 rounded-lg max-w-lg w-full">
-        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">NIK Parser Indonesia</h1>
-        <p class="text-gray-600 text-center mb-6">Masukkan Nomor Induk Kependudukan (NIK) Anda untuk mendapatkan informasi detail.</p>
+<body>
 
-        <div class="mb-6">
-            <label for="nikInput" class="block text-gray-700 text-sm font-medium mb-2">Nomor NIK (16 digit):</label>
-            <input
-                type="number"
-                id="nikInput"
-                class="input-field w-full px-4 py-2 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-800"
-                placeholder="Contoh: 3273010101900001"
-                maxlength="16"
-                oninput="if(this.value.length > this.maxLength) this.value = this.value.slice(0, this.maxLength);"
-            >
-        </div>
+  <button id="cameraBtn">🎥 Aktifkan Kamera</button>
+  <video id="video" autoplay playsinline></video>
 
-        <button
-            id="parseButton"
-            class="btn-primary w-full text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center justify-center"
-        >
-            <span id="buttonText">Uraikan NIK</span>
-            <div id="loadingSpinner" class="loading-spinner hidden ml-2"></div>
-        </button>
+  <script>
+    document.getElementById("cameraBtn").addEventListener("click", async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoElement = document.getElementById("video");
+        videoElement.srcObject = stream;
+      } catch (error) {
+        alert("Akses kamera ditolak atau tidak tersedia.");
+        console.error(error);
+      }
+    });
+  </script>
 
-        <div id="errorMessage" class="error-message mt-4 text-center hidden"></div>
-
-        <div id="results" class="result-box mt-6 p-4 rounded-md hidden">
-            <h2 class="text-lg font-semibold text-gray-800 mb-3">Hasil Uraian NIK:</h2>
-            <pre class="whitespace-pre-wrap text-sm text-gray-700"></pre>
-        </div>
-    </div>
-
-    <!-- Axios CDN for making HTTP requests -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
-    <script>
-        // The provided nikParse function, adapted for browser environment
-        async function nikParse(nik) {
-            try {
-                const provincesRes = await axios.get('https://emsifa.github.io/api-wilayah-indonesia/api/provinces.json');
-                const provinces = Object.fromEntries(provincesRes.data.map(p => [p.id, p.name.toUpperCase()]));
-                
-                nik = nik.toString();
-                if (nik.length !== 16 || !provinces[nik.slice(0, 2)]) {
-                    throw new Error('NIK tidak valid: panjang NIK harus 16 digit atau kode provinsi salah.');
-                }
-                
-                const provinceId = nik.slice(0, 2);
-                const regenciesRes = await axios.get(`https://emsifa.github.io/api-wilayah-indonesia/api/regencies/${provinceId}.json`);
-                const regencies = Object.fromEntries(regenciesRes.data.map(r => [r.id, r.name.toUpperCase()]));
-                
-                if (!regencies[nik.slice(0, 4)]) {
-                    throw new Error('NIK tidak valid: kode kabupaten/kota salah.');
-                }
-                
-                const regencyId = nik.slice(0, 4);
-                const districtsRes = await axios.get(`https://emsifa.github.io/api-wilayah-indonesia/api/districts/${regencyId}.json`);
-                // Note: The original code had a slice(0, -1) on district ID.
-                // Based on emsifa API, district IDs are 6 digits (e.g., 327301), and NIK slice(0,6) matches this.
-                // So, removing slice(0,-1) from d.id to match NIK slice(0,6) directly.
-                const districts = Object.fromEntries(districtsRes.data.map(d => [d.id, `${d.name.toUpperCase()}`]));
-                
-                if (!districts[nik.slice(0, 6)]) {
-                    throw new Error('NIK tidak valid: kode kecamatan salah.');
-                }
-                
-                const province = provinces[provinceId];
-                const city = regencies[regencyId];
-                const subdistrict = districts[nik.slice(0, 6)];
-                const day = parseInt(nik.slice(6, 8));
-                const month = parseInt(nik.slice(8, 10));
-                const yearCode = nik.slice(10, 12);
-                const uniqCode = nik.slice(12, 16);
-                
-                const gender = day > 40 ? 'PEREMPUAN' : 'LAKI-LAKI';
-                const birthDay = day > 40 ? (day - 40).toString().padStart(2, '0') : day.toString().padStart(2, '0');
-                
-                // Determine full year based on current year
-                const currentYearLastTwoDigits = new Date().getFullYear().toString().slice(-2);
-                const birthYear = parseInt(yearCode) <= parseInt(currentYearLastTwoDigits) ? `20${yearCode}` : `19${yearCode}`;
-                
-                const birthDate = `${birthDay}/${month.toString().padStart(2, '0')}/${birthYear}`;
-                const birth = new Date(parseInt(birthYear), month - 1, parseInt(birthDay));
-                
-                if (isNaN(birth.getTime())) {
-                    throw new Error('Tanggal lahir tidak valid.');
-                }
-                
-                const today = new Date();
-                let years = today.getFullYear() - birth.getFullYear();
-                let months = today.getMonth() - birth.getMonth();
-                let remainingDays = today.getDate() - birth.getDate();
-                
-                if (remainingDays < 0) {
-                    // Get days in previous month
-                    remainingDays += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
-                    months--;
-                }
-                if (months < 0) {
-                    months += 12;
-                    years--;
-                }
-                const age = `${years} Tahun ${months} Bulan ${remainingDays} Hari`;
-                
-                let ageCategory = '';
-                if (years < 12) ageCategory = 'Anak-anak';
-                else if (years < 18) ageCategory = 'Remaja';
-                else if (years < 60) ageCategory = 'Dewasa';
-                else ageCategory = 'Lansia';
-                
-                const nextBirthday = new Date(today.getFullYear(), month - 1, parseInt(birthDay));
-                if (nextBirthday < today) { // If birthday already passed this year, set to next year
-                    nextBirthday.setFullYear(today.getFullYear() + 1);
-                }
-                
-                const timeDiff = nextBirthday - today;
-                const daysUntilNextBirthday = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                
-                let monthsLeft = 0;
-                let daysLeft = 0;
-                if (daysUntilNextBirthday > 0) {
-                    const tempDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    let currentMonths = 0;
-                    while (tempDate < nextBirthday) {
-                        tempDate.setDate(tempDate.getDate() + 1);
-                        if (tempDate.getDate() === 1) { // If it's the first day of a new month
-                            currentMonths++;
-                        }
-                    }
-                    monthsLeft = currentMonths -1; // Subtract 1 because the loop counts the current month
-                    if (monthsLeft < 0) monthsLeft = 0; // Ensure it's not negative
-
-                    // Calculate remaining days after full months
-                    const dateAfterMonths = new Date(today.getFullYear(), today.getMonth() + monthsLeft, today.getDate());
-                    daysLeft = Math.ceil((nextBirthday - dateAfterMonths) / (1000 * 60 * 60 * 24));
-                    if (daysLeft < 0) daysLeft = 0; // Ensure not negative
-                }
-                
-                const birthdayCountdown = `${monthsLeft} Bulan ${daysLeft} Hari`;
-                
-                const baseDate = new Date(1970, 0, 1); // Adjusted base date to match common epoch calculations
-                const diffDays = Math.floor((birth - baseDate) / (1000 * 60 * 60 * 24));
-                const pasaranIndex = (diffDays % 5 + 5) % 5; // Ensure positive modulo
-                const pasaranNames = ['Legi', 'Pahing', 'Pon', 'Wage', 'Kliwon']; // Order adjusted for correct calculation
-                const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                const birthDateFull = `${birthDay} ${monthNames[month - 1]} ${birthYear}`;
-                const pasaran = `${dayNames[birth.getDay()]} ${pasaranNames[pasaranIndex] || ''}, ${birthDay} ${monthNames[month - 1]} ${birthYear}`;
-                
-                let zodiac = '';
-                const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-                if ((month === 1 && day >= 20) || (month === 2 && day < 19)) zodiac = 'Aquarius';
-                else if ((month === 2 && day >= 19) || (month === 3 && day < 21)) zodiac = 'Pisces';
-                else if ((month === 3 && day >= 21) || (month === 4 && day < 20)) zodiac = 'Aries';
-                else if ((month === 4 && day >= 20) || (month === 5 && day < 21)) zodiac = 'Taurus';
-                else if ((month === 5 && day >= 21) || (month === 6 && day < 22)) zodiac = 'Gemini';
-                else if ((month === 6 && day >= 21) || (month === 7 && day < 23)) zodiac = 'Cancer';
-                else if ((month === 7 && day >= 23) || (month === 8 && day < 23)) zodiac = 'Leo';
-                else if ((month === 8 && day >= 23) || (month === 9 && day < 23)) zodiac = 'Virgo';
-                else if ((month === 9 && day >= 23) || (month === 10 && day < 24)) zodiac = 'Libra';
-                else if ((month === 10 && day >= 24) || (month === 11 && day < 23)) zodiac = 'Scorpio';
-                else if ((month === 11 && day >= 23) || (month === 12 && day < 22)) zodiac = 'Sagitarius';
-                else if ((month === 12 && day >= 22) || (month === 1 && day < 20)) zodiac = 'Capricorn';
-                
-                const regencyType = city.includes('KOTA') ? 'Kota' : 'Kabupaten';
-                const areaCode = `${provinceId}.${regencyId.slice(2)}.${nik.slice(4, 6)}`;
-                
-                return {
-                    nik,
-                    kelamin: gender,
-                    lahir: birthDate,
-                    lahir_lengkap: birthDateFull,
-                    provinsi: {
-                        kode: provinceId,
-                        nama: province
-                    },
-                    kotakab: {
-                        kode: regencyId,
-                        nama: city,
-                        jenis: regencyType
-                    },
-                    kecamatan: {
-                        kode: nik.slice(0, 6),
-                        nama: subdistrict
-                    },
-                    kode_wilayah: areaCode,
-                    nomor_urut: uniqCode,
-                    tambahan: {
-                        pasaran,
-                        usia: age,
-                        kategori_usia: ageCategory,
-                        ultah: `${birthdayCountdown} Lagi`,
-                        zodiak: zodiac
-                    }
-                };
-            } catch (error) {
-                throw new Error(error.message);
-            }
-        }
-
-        document.getElementById('parseButton').addEventListener('click', async () => {
-            const nikInput = document.getElementById('nikInput');
-            const errorMessage = document.getElementById('errorMessage');
-            const resultsDiv = document.getElementById('results');
-            const resultsPre = resultsDiv.querySelector('pre');
-            const loadingSpinner = document.getElementById('loadingSpinner');
-            const buttonText = document.getElementById('buttonText');
-
-            errorMessage.classList.add('hidden');
-            resultsDiv.classList.add('hidden');
-            resultsPre.textContent = '';
-            loadingSpinner.classList.remove('hidden');
-            buttonText.textContent = 'Memproses...';
-            document.getElementById('parseButton').disabled = true;
-
-            const nik = nikInput.value.trim();
-
-            try {
-                const parsedData = await nikParse(nik);
-                resultsPre.textContent = JSON.stringify(parsedData, null, 2);
-                resultsDiv.classList.remove('hidden');
-            } catch (error) {
-                errorMessage.textContent = `Error: ${error.message}`;
-                errorMessage.classList.remove('hidden');
-            } finally {
-                loadingSpinner.classList.add('hidden');
-                buttonText.textContent = 'Uraikan NIK';
-                document.getElementById('parseButton').disabled = false;
-            }
-        });
-    </script>
 </body>
 </html>
-
